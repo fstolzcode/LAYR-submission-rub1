@@ -1,6 +1,6 @@
 # LAYR Submission Guidelines
 
-> Submission is done by creating a pull request in this repository containing all relevant files
+- Submission is done by creating a pull request in this repository containing all relevant files
 
 - Your submission should be placed in a separate directory within this repository, named as `institution-team` (e.g., `rub-1`)
 
