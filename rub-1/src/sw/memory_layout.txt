@@ -1,0 +1,15 @@
+This file documents the RAM memory layout.
+TODO: change asm_functions according to this file, then remove this TODO. Wait until layout is complete.
+
+RAM[0] = Reserved for Control Flow Protection
+RAM[1] = always 1
+RAM[2] = loop counter
+RAM[3] = loop limit
+RAM[4], RAM[5]  = bytes reserved for comparison
+RAM[6]-RAM[21] = 8 byte challenge for auth
+RAM[22] = reserved for SMOV and IMOV operations
+RAM[23]-RAM[61] = send and receive, this might be way smaller, further it might be necessary to separate send and receive.
+
+
+RAM[62] = incoming message length, verify if this is necessary
+RAM[63] = debug output

@@ -1,0 +1,199 @@
+meta:
+  version: 3
+  flow: Chip
+  substituting_steps:
+
+    # Magic reports some overlaps which can be ignored
+    Checker.IllegalOverlap: null
+
+    # Disable KLayout DRC
+    #KLayout.DRC: null
+    #Checker.KLayoutDRC: null
+
+    # Disable magic DRC
+    #Magic.DRC: null
+    #Checker.MagicDRC: null
+
+    # Disable KLayout antenna check
+    #KLayout.Antenna: null
+    #Checker.KLayoutAntenna: null
+
+    # Disable KLayout density check
+    #KLayout.Density: null
+    #Checker.KLayoutDensity: null
+
+    # Use Magic density-aware fill (replaces KLayout filler with reduced fine pass)
+    KLayout.Filler: Magic.MetalFiller
+
+    # Save time
+    #OpenROAD.IRDropReport: null
+    #KLayout.XOR: null
+    #Netgen.LVS: null
+    #Checker.LVS: null
+
+DESIGN_NAME: rubteam1
+VERILOG_FILES:
+- dir::../src/chip_top.sv
+- dir::../src/awesome-layr/rtl/main_controller.v
+- dir::../src/awesome-layr/rtl/uart_tx.v
+- dir::../src/awesome-layr/rtl/uart_rx.v
+- dir::../src/awesome-layr/rtl/rom.v
+- dir::../src/awesome-layr/rtl/crc.v
+- dir::../src/awesome-layr/rtl/spi_master.v
+- dir::../src/awesome-layr/rtl/eeprom.v
+- dir::../src/awesome-layr/rtl/rc522.v
+- dir::../src/awesome-layr/rtl/rc522_wrapper.v
+- dir::../src/awesome-layr/rtl/aes/aes_top.v
+- dir::../src/awesome-layr/rtl/aes/aes_round_datapath.v
+- dir::../src/awesome-layr/rtl/aes/aes_key_schedule.v
+- dir::../src/awesome-layr/rtl/aes_sbox.v
+- dir::../src/awesome-layr/rtl/aes_mix_columns.v
+- dir::../src/awesome-layr/rtl/aes_shift_rows.v
+- dir::../src/awesome-layr/rtl/gadgets/HPC2And.sv
+- dir::../src/awesome-layr/rtl/gadgets/HPC2Not.sv
+- dir::../src/awesome-layr/rtl/gadgets/HPC2Xor.sv
+- dir::../src/awesome-layr/rtl/gadgets/dff.sv
+- dir::../src/awesome-layr/rtl/gadgets/xor2.sv
+- dir::../src/awesome-layr/rtl/aes_wrapper.v
+- dir::../src/awesome-layr/rtl/aes/fault_protected_aes.v
+- dir::../src/awesome-layr/rtl/fault_mux.v
+- dir::../src/awesome-layr/rtl/trivium.v
+
+VERILOG_DEFINES: [FUNCTIONAL]
+
+# Enable plugin for better SystemVerilog support
+# USE_SLANG: True
+# SLANG_ARGUMENTS: ['--keep-hierarchy']
+
+# Slightly smaller file sizes
+PRIMARY_GDSII_STREAMOUT_TOOL: klayout
+
+# Specify the pad instances for the padring
+PAD_SOUTH: [
+    "user_io_1_pad",
+    "user_io_2_pad",
+    "user_io_3_pad",
+    "user_io_4_pad",
+    "vdd_south_pad",
+    "vss_south_pad"
+]
+
+PAD_EAST: [
+    
+    "vss_east_pad",
+    "spi_sclk_pad",
+    "spi_mosi_pad",
+    "spi_miso_pad",
+    "cs_0_pad",
+    "cs_1_pad"
+    
+]
+
+PAD_NORTH: [
+
+    "iovdd_north_pad",
+    "iovss_north_pad",
+    "status_busy_pad",
+    "status_fault_pad",
+    "status_unlock_pad",
+    "vdd_north_pad"
+    
+]
+
+PAD_WEST: [
+    
+    "rst_pad",
+    "sys_clk_pad",
+    "uart_clk_pad",
+    "user_io_0_pad",
+    "uart_rx_pad",
+    "uart_tx_pad"
+]
+
+# SDC files
+PNR_SDC_FILE: dir::../src/chip_top.sdc
+SIGNOFF_SDC_FILE: dir::../src/chip_top.sdc
+FALLBACK_SDC: dir::../src/chip_top.sdc
+
+# Power / ground nets
+VDD_NETS:
+- VDD
+GND_NETS:
+- VSS
+
+# Clock
+CLOCK_PORT: sys_clk_PAD
+CLOCK_NET: sys_clk_pad/p2c
+
+CLOCK_PERIOD: 100
+
+# Floorplanning
+FP_SIZING: absolute
+# 3880umx5070um including 26um
+# for the sealring on all sides
+DIE_AREA: [0, 0, 2699, 2699]
+CORE_AREA: [378, 378, 2321, 2321]
+
+#DIE_AREA: [0, 0, 1120, 1120]
+#CORE_AREA: [378.00, 378.00, 742, 742] 
+# Increase for more logic
+# on your die 60
+PL_TARGET_DENSITY_PCT: 60
+GRT_ALLOW_CONGESTION: true
+
+# Antenna repair 40, 35
+GRT_REPAIR_ANTENNAS: true
+GRT_ANT_ITERS: 25
+GRT_ANT_MARGIN: 45
+GRT_MAX_DIODE_INS_ITERS: 20
+
+DRT_ANTENNA_REPAIR_ITERS: 20
+DRT_ANTENNA_MARGIN: 50
+
+# Hold repair - increase margin to cover fast-corner hold violation (10ps)
+GRT_RESIZER_HOLD_SLACK_MARGIN: 0.3
+PL_RESIZER_HOLD_SLACK_MARGIN: 0.1
+PL_RESIZER_HOLD_MAX_BUFFER_PCT: 60
+
+# Slew repair - increase repair threshold to cover worst violation
+DESIGN_REPAIR_MAX_SLEW_PCT: 40
+GRT_DESIGN_REPAIR_MAX_SLEW_PCT: 30
+
+# Enable post-GRT timing repair (adds another repair pass)
+RUN_POST_GRT_RESIZER_TIMING: true
+
+# Reduce max fanout to force more buffer insertion (reduces cap violations)
+MAX_FANOUT_CONSTRAINT: 6
+
+# PDN
+PDN_CORE_RING: True
+
+# Override bondpad name
+PAD_BONDPAD_NAME: bondpad_70x70_novias
+
+# Bondpad is not yet included in the PDK
+EXTRA_GDS:
+- dir::../ip/bondpad_70x70/gds/bondpad_70x70.gds
+- dir::../ip/bondpad_70x70_novias/gds/bondpad_70x70_novias.gds
+
+EXTRA_LEFS:
+- dir::../ip/bondpad_70x70/lef/bondpad_70x70.lef
+- dir::../ip/bondpad_70x70_novias/lef/bondpad_70x70_novias.lef
+
+IGNORE_DISCONNECTED_MODULES:
+- bondpad_70x70
+- bondpad_70x70_novias
+
+# Maximum metal width without slotting: 30um
+PDN_CORE_RING_VWIDTH: 15
+PDN_CORE_RING_HWIDTH: 15
+# Ensure minimum spacing for long metals
+PDN_CORE_RING_VSPACING: 5
+PDN_CORE_RING_HSPACING: 5
+
+PDN_CORE_RING_CONNECT_TO_PADS: True
+PDN_ENABLE_PINS: False
+
+# Because we have multiple power pads for one power domain
+MAGIC_EXT_UNIQUE: notopports
+
