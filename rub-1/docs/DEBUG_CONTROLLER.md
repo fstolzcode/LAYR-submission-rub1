@@ -4,11 +4,7 @@
 
 The main controller (`rtl/main_controller.v`) contains an on-chip **debug controller**: a
 small UART-driven finite state machine that lets an external host inspect and control the
-CPU while the system is running. It is not a separate module — it is a set of always-blocks
-and functions inside `main_controller`, in the region marked
-`// --- START DEBUG CONTROLLER ---` … `// --- END DEBUG CONTROLLER ---`, plus a little
-support logic higher up in the file (the instruction-fetch mux, the `` `dbg_reset_fsm ``
-reset macro, and the register write-back that lives inside the CPU's own FETCH state).
+CPU while the system is running. It is not a separate module — it resides in the main controller.
 
 **Capabilities:**
 - Read most CPU / peripheral state asynchronously during execution (registers, flags, RAM,
@@ -23,7 +19,7 @@ answers on the shared UART TX line.
 
 > This document describes the debug controller **as implemented in the taped-out RTL** and
 > validated by `tb/test_main_controller.py`. It supersedes, for reference purposes, the
-> earlier design notes in `debug_controller_notes.md` (kept for historical rationale); where
+> earlier design notes in `debug_controller_notes.md` (kept for historical reasons); where
 > the two disagree, this document reflects the silicon. Features that were planned but are
 > not functional in this revision are listed under
 > [Reserved / Not Implemented](#reserved--not-implemented-in-this-revision).

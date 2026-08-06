@@ -11,9 +11,6 @@ performs a simple operation on internal RAM or issues a command to a peripheral 
 for it to finish.
 
 This document describes **how the CPU works** and gives an **overview of the submodules**.
-It deliberately does **not** cover:
-- the instruction set / assembly — see [`INSTRUCTION_SET.md`](INSTRUCTION_SET.md);
-- the UART debug controller — see [`DEBUG_CONTROLLER.md`](DEBUG_CONTROLLER.md).
 
 ## Top-Level Interface (chip pins)
 
@@ -42,9 +39,7 @@ It deliberately does **not** cover:
 The core idea: keep the CPU tiny and push all heavy lifting (crypto, SPI, NFC, CRC, UART)
 into dedicated peripheral state machines. The CPU issues a one-cycle command to a
 peripheral, then parks in a per-peripheral wait state polling a `busy`/`done` handshake,
-and finally collects the result. This is why the CPU is **multi-cycle**: every instruction
-walks through several FSM states, and peripheral instructions take as long as the
-peripheral needs.
+and finally collects the result.
 
 ### Module hierarchy
 
@@ -170,9 +165,7 @@ and `REP` state are all cleared.
 ### SPI subsystem — shared master
 
 [`spi_master.v`](../src/rtl/spi_master.v) is a single 8-bit SPI master: **Mode 0 (CPOL=0, CPHA=0),
-MSB-first**, SCLK ≈ 2.5 MHz (10 MHz / 4). It exposes two active-low chip selects and does
-**no internal arbitration** — it inverts the two CS requests onto the pins and shifts
-whatever `tx_data` it is given.
+MSB-first**, SCLK ≈ 2.5 MHz (10 MHz / 4). It exposes two active-low chip selects.
 
 Bus sharing is wired in `main_controller` ([main_controller.v:162-263](../src/rtl/main_controller.v#L162)):
 - **`spi_cs_0` → EEPROM, `spi_cs_1` → RC522**; each slave has its own CS on a shared data bus.
@@ -186,14 +179,13 @@ Bus sharing is wired in `main_controller` ([main_controller.v:162-263](../src/rt
 [`eeprom.v`](../src/rtl/eeprom.v) is a **read-only** controller for ATMEL AT250xxB-series SPI
 EEPROMs. It issues the `READ` command (0x03) with a 7-bit address, then clocks out data
 bytes via the shared SPI master; the chip's internal address auto-increment allows streaming
-sequential reads by re-pulsing `enable`. Backs the `ROMRD` instruction (CPU sets the address
-from `BAR + operand`, pulses enable, waits in `WAIT_EEPROM`, latches the byte).
+sequential reads by re-pulsing `enable`.
 
 ### RC522 NFC reader
 
 Two modules:
 - [`rc522.v`](../src/rtl/rc522.v) — a full ISO 14443-A reader controller that drives an **external
-  NXP MFRC522** over SPI: soft reset + initialization sequence (antenna on, timers, ASK
+   MFRC522** over SPI: soft reset + initialization sequence (antenna on, timers, ASK
   modulation, version check for 0x88/0x91/0x92), transceive, FIFO I/O, and per-frame
   bit-length control (for short frames like REQA/WUPA). It uses `spi_cs_1`.
 - [`rc522_wrapper.v`](../src/rtl/rc522_wrapper.v) — the CPU-facing adapter that turns the byte-
@@ -207,7 +199,7 @@ The CPU drives these via `rc522_en` + a `do_*` strobe and waits in `WAIT_RC522`.
 
 [`crc.v`](../src/rtl/crc.v) is a bit-serial CRC-16 with polynomial `0x8408` (reflected CCITT
 0x1021) and init value `0x6363`, LSB-first, no final XOR — i.e. the **ISO 14443-A CRC_A**
-used by MIFARE, matching the NFC role. It processes one byte per `load_byte` pulse. Backs
+used by MIFARE, matching the NFC role. It processes one byte per `load_byte` pulse. Implements
 the CRC instructions (`CRCRST/CRCLD/CRCH/CRCL`) and the block variants (`CRCPW`, `CRCPC`),
 which the CPU services via `WAIT_CRC` and the multi-byte `WAIT_CRCP` loop.
 
@@ -246,8 +238,7 @@ continuously feed the AES randomness bus; the top 8 bits `[339:332]` are the byt
 by the `RNGGET` instruction (the CPU waits in `WAIT_RNG` until `rng_rdy`). `RNGRST` re-seeds
 the warm-up.
 
-> **Note (this revision).** Trivium is seeded with two **hardcoded** key/IV constants marked
-> `CHANGE LATER` ([main_controller.v:290](../src/rtl/main_controller.v#L290)), so the RNG is
+> **Note (this revision).** Trivium is seeded with two **hardcoded** key/IV constants so the RNG is
 > currently deterministic. The intended physical entropy source
 > [`ring_oscillator.v`](../src/rtl/ring_oscillator.v) exists but is **not instantiated** anywhere in
 > the build.
@@ -270,7 +261,7 @@ the warm-up.
   `uart_clk_in`/16); both UART instances are edge-synchronized to it.
 - **`rst`** — active-high synchronous reset. Exiting debug mode also triggers a CPU reset.
 
-## Notes on Non-Obvious / Reserved Details
+## Reserved Details
 
 - **`ring_oscillator.v` is not built** — the RNG uses Trivium with a fixed seed; the entropy
   path is intended-but-unwired in this snapshot.
