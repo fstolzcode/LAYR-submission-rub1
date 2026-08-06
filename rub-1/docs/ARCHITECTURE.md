@@ -3,7 +3,7 @@
 ## Overview
 
 This chip is a custom **multi-cycle CPU** whose top module is
-[`rtl/main_controller.v`](rtl/main_controller.v). Rather than being a general-purpose
+[`rtl/main_controller.v`](../src/rtl/main_controller.v). Rather than being a general-purpose
 processor, it is a compact controller core that **orchestrates a set of hardware
 sub-FSMs** (crypto and I/O peripherals) to carry out an NFC authentication protocol with a
 JavaCard. The CPU executes a small custom instruction set from ROM; each instruction either
@@ -12,13 +12,13 @@ for it to finish.
 
 This document describes **how the CPU works** and gives an **overview of the submodules**.
 It deliberately does **not** cover:
-- the instruction set / assembly — see [`sw/INSTRUCTION_SET.md`](sw/INSTRUCTION_SET.md);
+- the instruction set / assembly — see [`INSTRUCTION_SET.md`](INSTRUCTION_SET.md);
 - the UART debug controller — see [`DEBUG_CONTROLLER.md`](DEBUG_CONTROLLER.md).
 
 ## Top-Level Interface (chip pins)
 
 `main_controller` is the top module; its ports are the chip's external interface
-([main_controller.v:2](rtl/main_controller.v#L2)):
+([main_controller.v:2](../src/rtl/main_controller.v#L2)):
 
 | Signal | Dir | Description |
 |--------|-----|-------------|
@@ -68,7 +68,7 @@ main_controller (top)                         ── CPU control FSM + datapath 
 └── uart_tx                 (dbg_uart_tx)      ── UART TX, shared CPU/debug
 ```
 
-Masking primitives live in [`rtl/gadgets/`](rtl/gadgets/) (HPC2 gadgets) and are used inside
+Masking primitives live in [`rtl/gadgets/`](../src/rtl/gadgets/) (HPC2 gadgets) and are used inside
 the AES S-box, key schedule, and fault mux.
 
 ---
@@ -78,7 +78,7 @@ the AES S-box, key schedule, and fault mux.
 ### Memories
 
 - **Program memory** — a unified 1024-word × 18-bit instruction space selected by `pc[9]`:
-  addresses 0–511 come from the 512-word mask ROM ([`rom.v`](rtl/rom.v)), 512–1023 from the
+  addresses 0–511 come from the 512-word mask ROM ([`rom.v`](../src/rtl/rom.v)), 512–1023 from the
   512-word debug instruction RAM. See INSTRUCTION_SET.md and DEBUG_CONTROLLER.md for details.
 - **Work RAM** — 64 × 8-bit (`ram_data[0:63]`). All RAM accesses are relative to the **BAR
   (Base Address Register)**: `ram_data[BAR + operand]`. See INSTRUCTION_SET.md.
@@ -100,7 +100,7 @@ the AES S-box, key schedule, and fault mux.
 
 ### Instruction cycle (main FSM)
 
-The CPU FSM ([main_controller.v:28-41](rtl/main_controller.v#L28)) has a fetch/execute/
+The CPU FSM ([main_controller.v:28-41](../src/rtl/main_controller.v#L28)) has a fetch/execute/
 writeback backbone plus one wait state per peripheral:
 
 | State | # | Role |
@@ -150,7 +150,7 @@ Handled in WRITEBACK (details in INSTRUCTION_SET.md):
 
 Reset is synchronous and active-high. The CPU is also fully reset when the debugger is
 *disabled* after having been active: the reset guard is
-`if (rst || (dbg_initialized && ~mode))` ([main_controller.v:376](rtl/main_controller.v#L376)),
+`if (rst || (dbg_initialized && ~mode))` ([main_controller.v:376](../src/rtl/main_controller.v#L376)),
 so leaving debug mode returns `pc=0`, `state=FETCH`. On reset the PC, flags, call stack, BAR,
 and `REP` state are all cleared.
 
@@ -158,7 +158,7 @@ and `REP` state are all cleared.
 
 - `busy` — asserted whenever the CPU is running.
 - `hard_fault` — raised on an illegal opcode or invalid state
-  ([main_controller.v:830](rtl/main_controller.v#L830)). This is a **control-flow** fault flag
+  ([main_controller.v:830](../src/rtl/main_controller.v#L830)). This is a **control-flow** fault flag
   only; it is separate from the AES data-fault correction, which is handled silently inside
   the AES subsystem.
 - `unlock` — the door-unlock output, set/cleared by the `LOCK` instruction (`unlock_reg`).
@@ -169,12 +169,12 @@ and `REP` state are all cleared.
 
 ### SPI subsystem — shared master
 
-[`spi_master.v`](rtl/spi_master.v) is a single 8-bit SPI master: **Mode 0 (CPOL=0, CPHA=0),
+[`spi_master.v`](../src/rtl/spi_master.v) is a single 8-bit SPI master: **Mode 0 (CPOL=0, CPHA=0),
 MSB-first**, SCLK ≈ 2.5 MHz (10 MHz / 4). It exposes two active-low chip selects and does
 **no internal arbitration** — it inverts the two CS requests onto the pins and shifts
 whatever `tx_data` it is given.
 
-Bus sharing is wired in `main_controller` ([main_controller.v:162-263](rtl/main_controller.v#L162)):
+Bus sharing is wired in `main_controller` ([main_controller.v:162-263](../src/rtl/main_controller.v#L162)):
 - **`spi_cs_0` → EEPROM, `spi_cs_1` → RC522**; each slave has its own CS on a shared data bus.
 - `tx_data`/`start_tx` are muxed combinationally on `spi_open_cs0`: when the EEPROM asserts
   its CS request it wins the bus, otherwise the RC522 owns it. In practice the firmware uses
@@ -183,7 +183,7 @@ Bus sharing is wired in `main_controller` ([main_controller.v:162-263](rtl/main_
 
 ### EEPROM controller
 
-[`eeprom.v`](rtl/eeprom.v) is a **read-only** controller for ATMEL AT250xxB-series SPI
+[`eeprom.v`](../src/rtl/eeprom.v) is a **read-only** controller for ATMEL AT250xxB-series SPI
 EEPROMs. It issues the `READ` command (0x03) with a 7-bit address, then clocks out data
 bytes via the shared SPI master; the chip's internal address auto-increment allows streaming
 sequential reads by re-pulsing `enable`. Backs the `ROMRD` instruction (CPU sets the address
@@ -192,11 +192,11 @@ from `BAR + operand`, pulses enable, waits in `WAIT_EEPROM`, latches the byte).
 ### RC522 NFC reader
 
 Two modules:
-- [`rc522.v`](rtl/rc522.v) — a full ISO 14443-A reader controller that drives an **external
+- [`rc522.v`](../src/rtl/rc522.v) — a full ISO 14443-A reader controller that drives an **external
   NXP MFRC522** over SPI: soft reset + initialization sequence (antenna on, timers, ASK
   modulation, version check for 0x88/0x91/0x92), transceive, FIFO I/O, and per-frame
   bit-length control (for short frames like REQA/WUPA). It uses `spi_cs_1`.
-- [`rc522_wrapper.v`](rtl/rc522_wrapper.v) — the CPU-facing adapter that turns the byte-
+- [`rc522_wrapper.v`](../src/rtl/rc522_wrapper.v) — the CPU-facing adapter that turns the byte-
   oriented RC522 opcodes (`RC522RST/PUSH/POP/BLEN/TRCVE/BUFRST/WAIT/RXNUM`) into the core's
   512-bit block interface (push/pop bytes into a shift buffer, set last-byte bit length,
   launch a transceive, read the received-byte count).
@@ -205,7 +205,7 @@ The CPU drives these via `rc522_en` + a `do_*` strobe and waits in `WAIT_RC522`.
 
 ### CRC-16 engine
 
-[`crc.v`](rtl/crc.v) is a bit-serial CRC-16 with polynomial `0x8408` (reflected CCITT
+[`crc.v`](../src/rtl/crc.v) is a bit-serial CRC-16 with polynomial `0x8408` (reflected CCITT
 0x1021) and init value `0x6363`, LSB-first, no final XOR — i.e. the **ISO 14443-A CRC_A**
 used by MIFARE, matching the NFC role. It processes one byte per `load_byte` pulse. Backs
 the CRC instructions (`CRCRST/CRCLD/CRCH/CRCL`) and the block variants (`CRCPW`, `CRCPC`),
@@ -220,18 +220,18 @@ aes_wrapper → fault_protected_aes → aes_top → { aes_key_schedule, aes_roun
                      └── fault_mux                 (+ aes_shift_rows, aes_mix_columns per share)
 ```
 
-- [`aes_wrapper.v`](rtl/aes_wrapper.v) — byte-serial front end for the 8-bit CPU: shift 16
+- [`aes_wrapper.v`](../src/rtl/aes_wrapper.v) — byte-serial front end for the 8-bit CPU: shift 16
   bytes of plaintext and **two key shares** in, set mode, start, and shift the result out.
   Backs the `AES*` opcodes; the CPU waits in `WAIT_AES`.
-- [`aes/fault_protected_aes.v`](rtl/aes/fault_protected_aes.v) — **fault countermeasure**:
+- [`aes/fault_protected_aes.v`](../src/rtl/aes/fault_protected_aes.v) — **fault countermeasure**:
   runs the cipher three times (re-masking the input each run) and does a masked bitwise
   **majority vote** to correct single faults before de-masking the output.
-- [`aes/aes_top.v`](rtl/aes/aes_top.v) — masked AES-128 round core operating on **two Boolean
+- [`aes/aes_top.v`](../src/rtl/aes/aes_top.v) — masked AES-128 round core operating on **two Boolean
   shares** throughout; linear layers (AddRoundKey, ShiftRows, MixColumns) run per share, and
   only the nonlinear SubBytes uses masked gadgets.
-- [`aes_sbox.v`](rtl/aes_sbox.v), [`aes/aes_key_schedule.v`](rtl/aes/aes_key_schedule.v),
-  [`fault_mux.v`](rtl/fault_mux.v) — the nonlinear/masked blocks, built from the **HPC2
-  gadgets** in [`gadgets/`](rtl/gadgets/).
+- [`aes_sbox.v`](../src/rtl/aes_sbox.v), [`aes/aes_key_schedule.v`](../src/rtl/aes/aes_key_schedule.v),
+  [`fault_mux.v`](../src/rtl/fault_mux.v) — the nonlinear/masked blocks, built from the **HPC2
+  gadgets** in [`gadgets/`](../src/rtl/gadgets/).
 
 > **Security summary.** Masking = HPC2 gadgets, **2 shares, first-order (glitch-robust)**;
 > only the AND gadgets consume randomness. The key is entered as two shares; the plaintext is
@@ -240,24 +240,24 @@ aes_wrapper → fault_protected_aes → aes_top → { aes_key_schedule, aes_roun
 
 ### Random number generator (Trivium)
 
-[`trivium.v`](rtl/trivium.v) is an unrolled Trivium stream cipher producing a 340-bit
-parallel keystream ([main_controller.v:286](rtl/main_controller.v#L286)). Bits `[331:0]`
+[`trivium.v`](../src/rtl/trivium.v) is an unrolled Trivium stream cipher producing a 340-bit
+parallel keystream ([main_controller.v:286](../src/rtl/main_controller.v#L286)). Bits `[331:0]`
 continuously feed the AES randomness bus; the top 8 bits `[339:332]` are the byte returned
 by the `RNGGET` instruction (the CPU waits in `WAIT_RNG` until `rng_rdy`). `RNGRST` re-seeds
 the warm-up.
 
 > **Note (this revision).** Trivium is seeded with two **hardcoded** key/IV constants marked
-> `CHANGE LATER` ([main_controller.v:290](rtl/main_controller.v#L290)), so the RNG is
+> `CHANGE LATER` ([main_controller.v:290](../src/rtl/main_controller.v#L290)), so the RNG is
 > currently deterministic. The intended physical entropy source
-> [`ring_oscillator.v`](rtl/ring_oscillator.v) exists but is **not instantiated** anywhere in
+> [`ring_oscillator.v`](../src/rtl/ring_oscillator.v) exists but is **not instantiated** anywhere in
 > the build.
 
 ### UART
 
-- [`uart_tx.v`](rtl/uart_tx.v) — 8N1 transmitter, baud = `uart_clk_in`/16. A single instance
+- [`uart_tx.v`](../src/rtl/uart_tx.v) — 8N1 transmitter, baud = `uart_clk_in`/16. A single instance
   is **shared** between the CPU (`UARTTX` instruction) and the debug controller, muxed by
   `mode`. The CPU uses the two-phase `WAIT_UARTTX_1/2` handshake.
-- [`uart_rx.v`](rtl/uart_rx.v) — 8N1 receiver with majority-vote sampling and framing-error
+- [`uart_rx.v`](../src/rtl/uart_rx.v) — 8N1 receiver with majority-vote sampling and framing-error
   detection. It is **not** tied to a CPU opcode; it is the **debug command input** channel
   (see DEBUG_CONTROLLER.md).
 
@@ -279,11 +279,11 @@ the warm-up.
 - **`rom.mem` contains 1024 lines but only the first 512 are loaded** (the ROM array is
   512 deep); some `1024`/`10-bit` comments in `rom.v` are stale — the physical ROM is 512×18,
   9-bit addressed.
-- **Test stubs are not in the datapath.** [`eeprom_testmodule.v`](rtl/eeprom_testmodule.v)
-  and [`rc522_testmodule.v`](rtl/rc522_testmodule.v) are standalone sim top-levels, each with
+- **Test stubs are not in the datapath.** [`eeprom_testmodule.v`](../src/rtl/eeprom_testmodule.v)
+  and [`rc522_testmodule.v`](../src/rtl/rc522_testmodule.v) are standalone sim top-levels, each with
   their own `spi_master`; `rc522_testmodule.v` is out of sync with the current `rc522.v` port
   list and is test-only.
-- [`test_gadget.v`](rtl/test_gadget.v) is a masking-gadget demonstrator, not part of the CPU.
+- [`test_gadget.v`](../src/rtl/test_gadget.v) is a masking-gadget demonstrator, not part of the CPU.
 
 ## Module Reference
 
